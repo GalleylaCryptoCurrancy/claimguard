@@ -1,0 +1,9 @@
+# Foundry
+cache/
+out/
+broadcast/
+lib/
+
+# Local environment / keys — never commit
+.env
+*.key

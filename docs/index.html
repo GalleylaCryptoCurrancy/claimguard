@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaimGuard — Agent ID-gated safe-claim registry</title>
+<meta name="description" content="ClaimGuard is an on-chain safety registry for autonomous agents on BNB Chain. Only Agent ID holders can register a safety policy and record claim-gate attestations: what their tooling claimed, and what its safety gates refused.">
+<style>
+  :root { --bg:#0b0e13; --card:#12161f; --line:#232a38; --text:#e8ecf3; --muted:#9aa7ba; --accent:#f0b90b; --ok:#3fb96f; --no:#e05d5d; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); line-height:1.55; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 20px 64px; }
+  h1 { font-size: 2.2rem; margin: 0 0 6px; }
+  h1 .accent { color: var(--accent); }
+  h2 { margin-top: 40px; font-size: 1.3rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); }
+  .tagline { font-size: 1.1rem; color: var(--muted); margin-top: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; margin: 14px 0; }
+  code { background:#1a2030; padding: 1px 6px; border-radius: 5px; font-size: .92em; word-break: break-all; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .pass { color: var(--ok); font-weight: 600; }
+  .refuse { color: var(--no); font-weight: 600; }
+  a { color: var(--accent); }
+  footer { margin-top: 48px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Claim<span class="accent">Guard</span></h1>
+  <p class="tagline">An Agent ID-gated safe-claim registry for autonomous agents on BNB Chain.</p>
+
+  <div class="card">
+    <p><strong>The problem.</strong> Autonomous agents now claim value-bearing opportunities —
+    red packets, mints, airdrops — on behalf of their owners. That is exactly where scam
+    contracts and drainer previews strike: one bad claim can empty a wallet, and today an
+    agent's safety decisions leave no public trace.</p>
+    <p><strong>The product.</strong> ClaimGuard lets any <strong>Agent ID</strong> holder register
+    a hash of their agent's safety policy on-chain, then write an attestation for every
+    safety-gate evaluation their tooling performs: <span class="pass">PASSED</span> when all
+    gates were green and the claim proceeded, <span class="refuse">REFUSED</span> — with a
+    machine-readable reason code — when a gate stopped it. The result is a public, auditable
+    trail of what an agent claimed, and what its safety gates refused.</p>
+  </div>
+
+  <div class="card">
+    <p><strong>Live on BNB Chain mainnet.</strong> ClaimGuardRegistry:
+    <a href="https://bscscan.com/address/0x9B6f33D9aE6B01eb56e44DADA9F7FF2fAB9B0d14"><code>0x9B6f33D9aE6B01eb56e44DADA9F7FF2fAB9B0d14</code></a></p>
+    <p>Registry counters, read on-chain on 2026-11-21: <strong>1</strong> registered agent ·
+    <strong>3</strong> attestations (<span class="pass">0 passed</span> /
+    <span class="refuse">3 refused</span>). The first registered agent is the reference
+    monitor described below; its three attestations are real gate refusals — code-gated
+    packets held for a human-supplied code (<code>CODE_REQUIRED</code>). A visible refusal
+    trail is the product working as designed.</p>
+  </div>
+
+  <h2>How Agent ID is used</h2>
+  <ul>
+    <li><strong>Registration is gated by Agent ID.</strong> <code>registerAgent(policyHash)</code>
+    checks the caller's balance in the official Agent ID registry
+    (<code>0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F</code>) and reverts for non-holders.
+    Agent ID is not a badge on the page — it is the access key to the registry.</li>
+    <li><strong>Attestations are keyed to the agent's address</strong>, so an Agent ID holder's
+    safety record is publicly readable via <code>isRegisteredAgent</code>, <code>agentPolicy</code>
+    and the <code>ClaimAttested</code> event stream.</li>
+    <li><strong>The reference integration is Agent-ID-native:</strong> ClaimGuard's monitor watches
+    agentid.im red packets, which are claimable <em>only</em> by Agent ID holders, and attests
+    every gate outcome for them.</li>
+  </ul>
+
+  <h2>The safety gates (fail-closed)</h2>
+  <div class="grid">
+    <div class="card"><strong>Helper-only calls.</strong> The monitor only ever executes calls
+    produced by the audited claim helper — never hand-built calldata.</div>
+    <div class="card"><strong>Exactly one call.</strong> A claim must resolve to a single
+    contract call; anything else is refused (reason <code>UNEXPECTED_CALL_SET</code>).</div>
+    <div class="card"><strong>Exact preview match.</strong> The signed preview must name the
+    expected contract and the exact incoming asset, with value 0 — mismatches are refused
+    (<code>PREVIEW_TARGET_MISMATCH</code>, <code>PREVIEW_VALUE_NONZERO</code>).</div>
+    <div class="card"><strong>Standard assets only.</strong> Custom-token opportunities are
+    refused and reported, never auto-claimed (<code>CUSTOM_TOKEN</code>).</div>
+    <div class="card"><strong>Human-held codes.</strong> Code-gated opportunities wait for a
+    human-supplied code instead of guessing (<code>CODE_REQUIRED</code>).</div>
+    <div class="card"><strong>Asset-free registry.</strong> The ClaimGuard contract holds no
+    funds, has no payable functions, requests no approvals, and has no owner or admin
+    functions at all.</div>
+  </div>
+
+  <h2>Register your agent</h2>
+  <ol>
+    <li>Hold an Agent ID (an <code>.ai</code> agent identity) in your wallet on BNB Chain.</li>
+    <li>Publish your agent's safety policy anywhere public (a repo README is fine) and take
+    its keccak256 hash.</li>
+    <li>Connect a standard wallet (browser extension or WalletConnect) and call
+    <code>registerAgent(policyHash)</code> on the ClaimGuardRegistry contract. Registration
+    carries no protocol fee — you pay only the BNB Chain gas: one transaction of ~96,000
+    gas, about 0.000005 BNB at recent gas prices (well under one US cent; roughly $0.05
+    even if gas were 20× higher).</li>
+    <li>Point your tooling at <code>attestClaim(...)</code> after each gate evaluation, or
+    use the reference monitor integration in the repository.</li>
+  </ol>
+
+  <h2>Contract &amp; code</h2>
+  <p>Contract: <a href="https://bscscan.com/address/0x9B6f33D9aE6B01eb56e44DADA9F7FF2fAB9B0d14"><code>ClaimGuardRegistry — 0x9B6f33D9aE6B01eb56e44DADA9F7FF2fAB9B0d14</code></a>
+  (BNB Chain mainnet) · deployment transaction
+  <a href="https://bscscan.com/tx/0x1bb3d960b9a0a4bff0dae413ff2876ccac1c2e831df5f1b2276738c8560041f6">0x1bb3d960…41f6</a>.</p>
+  <p>Verified source: <a href="https://sourcify.dev/#/lookup/0x9B6f33D9aE6B01eb56e44DADA9F7FF2fAB9B0d14">Sourcify — exact (full) match</a>.
+  Source code, tests, monitor integration and the safety design document:
+  <a href="https://github.com/GalleylaCryptoCurrancy/claimguard">github.com/GalleylaCryptoCurrancy/claimguard</a>.</p>
+
+  <h2>Risk notice</h2>
+  <p class="muted">ClaimGuard is a record-keeping and safety-gating tool. It does not hold,
+  manage, or move user assets, and it makes no promise of returns of any kind. Interacting
+  with any smart contract carries risk; review the verified source before registering.
+  ClaimGuard is an independent project built for the Binance Agent ID Hackathon; it is not
+  affiliated with or endorsed by Binance.</p>
+
+  <footer>ClaimGuard · BNB Chain · Agent ID-gated · Asset-free by construction</footer>
+</main>
+</body>
+</html>
